@@ -52,11 +52,8 @@ def compute_ranks(src_representations: np.ndarray,
     return np.sum(distances <= correct_elements, axis=-1), distances
 
 
-# <--- MODIFIED: Renamed function to reflect its new purpose
-def compute_per_query_scores(code_representation, docstring_representation, test_batch_size, distance_metric):
-    """
-    Computes the reciprocal rank for each query and returns them as a list.
-    """
+
+def compute_evaluation_metrics(code_representation,docstring_representation,test_batch_size,distance_metric):
     assert len(code_representation) > 0, 'data must have more than 0 rows.'
     assert len(docstring_representation) > 0, 'data must have more than 0 rows.'
     assert len(code_representation) == len(docstring_representation)
@@ -68,8 +65,9 @@ def compute_per_query_scores(code_representation, docstring_representation, test
     random_code_representation = code_representation[idxs]
     random_docstring_representation = docstring_representation[idxs]
 
-    # <--- NEW: Initialize a list to store scores from all batches
-    all_reciprocal_ranks = []
+    max_samples = 50
+    sum_mrr = 0.0
+    num_batches = 0
     
     batched_random_code_representation = list(chunked(list(random_code_representation), test_batch_size)) 
     batched_random_docstring_representation = list(chunked(list(random_docstring_representation), test_batch_size))
@@ -77,19 +75,15 @@ def compute_per_query_scores(code_representation, docstring_representation, test
     for batch_idx, (batch_code, batch_doc) in enumerate(zip(batched_random_code_representation, batched_random_docstring_representation)):
         if len(batch_code) < test_batch_size:
             break  # the last batch is smaller than the others, exclude.
-        
+        num_batches += 1
         ranks, distances = compute_ranks(batch_code,
                                              batch_doc,
                                              distance_metric)
-        
-        # <--- NEW: Calculate reciprocal ranks for the current batch
-        reciprocal_ranks_batch = 1.0 / ranks
-        
-        # <--- NEW: Extend the master list with the scores from this batch
-        all_reciprocal_ranks.extend(reciprocal_ranks_batch.tolist())
+        sum_mrr += np.mean(1.0 / ranks)
+        # print(f"Batch number: {num_batches}, Sum_MRR: {sum_mrr}")
+    eval_mrr = sum_mrr / num_batches
 
-    # <--- MODIFIED: Return the full list of scores, not the mean
-    return all_reciprocal_ranks
+    return eval_mrr
 
 def load_representations(file_path: str) -> np.ndarray:
     return np.load(file_path)
@@ -133,12 +127,8 @@ def get_list_for_qu(data,name,instruction):
 
 def save_json(data, file_path):
     try:
-        # <--- MODIFIED: Ensure numpy types are converted to native Python types for JSON serialization
-        def convert(o):
-            if isinstance(o, np.generic): return o.item()  
-            raise TypeError
         with open(file_path, 'w', encoding='utf-8') as file:
-            json.dump(data, file, ensure_ascii=False, indent=4, default=convert)
+            json.dump(data, file, ensure_ascii=False, indent=4)
         print(f"Data successfully saved to {file_path}")
     except Exception as e:
         print(f"Failed to save data to {file_path}. Error: {e}")
@@ -182,9 +172,6 @@ def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_
         data_docstring_path = "{}/test/{}/{}_data_docstring_repre.npy".format(result_path, language, language)
         test_data_file= "{}/{}/{}/final/jsonl/test/{}_test_0.jsonl".format(test_data_path_dir,language,language, language)
         
-        # <--- NEW: Define path for saving the list of per-query scores
-        per_query_scores_path = os.path.join(output_cal_path, f"{language}_per_query_scores.json")
-        
         
         if not os.path.exists(output_cal_path):
             os.makedirs(output_cal_path, exist_ok=True)
@@ -204,6 +191,7 @@ def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_
             data_code_representation = get_model_embedding(data_code,get_model_embedding_batch_size, l2v)
             save_representations(data_code_representation, data_code_path)
             print("Shape of data_code_representation:", np.array(data_code_representation).shape)
+
             
 
         if os.path.exists(data_docstring_path):
@@ -219,27 +207,16 @@ def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_
             save_representations(data_docstring_representation, data_docstring_path)
             print("Shape of data_docstring_representation:", np.array(data_docstring_representation).shape)
 
-        # <--- MODIFIED: Call the new function to get the list of scores
-        per_query_scores = compute_per_query_scores(
-            data_code_representation, 
-            data_docstring_representation, 
-            test_batch_size, 
-            distance_metric
-        )
-        
-        # <--- NEW: Save the list of per-query scores to a file
-        save_json(per_query_scores, per_query_scores_path)
-        
-        # <--- NEW: Calculate the final MRR from the list for reporting
-        mrr_score_value = np.mean(per_query_scores) if per_query_scores else 0.0
-        
+        # Calculate MRR
+        mrr_score_value =  compute_evaluation_metrics(data_code_representation,data_docstring_representation,test_batch_size,distance_metric)
+
         end_time = time.time()
         elapsed_time = end_time - start_time
-        
-        # Keep the original saving logic for the final MRR score for convenience
-        print(f"Language: {language}, MRR: {mrr_score_value:.4f}, Elapsed Time: {elapsed_time:.2f}s")
-        mrr_score = {f'{language}_mrr': mrr_score_value, 'elapsed_time': elapsed_time}
+        print(f"Time taken to create/check directory: {elapsed_time} seconds")
+        mrr_score = {f'{language}_mrr': mrr_score_value,'elapsed_time':elapsed_time}
         save_json(mrr_score, mrr_path)
+
+
 
 
 def main():

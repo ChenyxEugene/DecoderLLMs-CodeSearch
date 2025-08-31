@@ -1,43 +1,32 @@
-import json
-import torch
-import os
-import numpy as np
-import time
 import sys
 import argparse
+import logging
+import os
+import pickle
+import random
+import torch
+import json
+import numpy as np
+import time
 from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModel, AutoConfig, RobertaTokenizer, RobertaModel, RobertaConfig
+
+from llm2vec import LLM2Vec
+from transformers import AutoTokenizer, AutoModel, AutoConfig
 from peft import PeftModel
 
 from typing import Optional, List, Dict, Any, NamedTuple, Iterable, Tuple
 from more_itertools import chunked, flatten
 from scipy.spatial.distance import cdist
 
-import torch.nn as nn
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import random
-import logging
+# 设置环境变量
+os.environ["HF_HUB_OFFLINE"] = "1"
+# os.environ["HF_HOME"] = "/share/home/chenyuxuan/.cache/huggingface/hub"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                 datefmt='%m/%d/%Y %H:%M:%S',level=logging.INFO )
-
-class CodeBertModel(nn.Module):
-    def __init__(self, encoder):
-        super(CodeBertModel, self).__init__()
-        self.encoder = encoder
-      
-    def forward(self, code_inputs=None, nl_inputs=None): 
-        if code_inputs is not None:
-            outputs = self.encoder(code_inputs,attention_mask=code_inputs.ne(1))[1]
-            return torch.nn.functional.normalize(outputs, p=2, dim=1)
-        else:
-            outputs = self.encoder(nl_inputs,attention_mask=nl_inputs.ne(1))[1]
-            return torch.nn.functional.normalize(outputs, p=2, dim=1)
-
-
 
 def Calculate_MAP(sort_lists,eval_file,query_idxs):
     sum = 0
@@ -126,37 +115,7 @@ def CalculateMRR(sort_lists,eval_file,query_idxs):
 def load_representations(file_path: str) -> np.ndarray:
     return np.load(file_path)
 
-def tokenize_and_convert_to_ids(text_list, max_length=512):
-
-    all_token_ids = []
-
-    for text in text_list:
-
-        cleaned_text = ' '.join(text.split())
-        tokens = tokenizer.tokenize(cleaned_text)[:max_length - 2] 
-        tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token] 
-        token_ids = tokenizer.convert_tokens_to_ids(tokens)  
-        padding_length = max_length - len(token_ids)
-        token_ids += [tokenizer.pad_token_id] * padding_length  
-
-        all_token_ids.append(token_ids)
-    
-    return torch.tensor(all_token_ids, dtype=torch.long)
-
-def codebert_embedding(data,  character,model):
-    inputs0 = tokenize_and_convert_to_ids(data)
-    inputs = inputs0.to(device)  
-    with torch.no_grad():
-        if character == 'code_inputs':
-            return model(code_inputs=inputs)
-        elif character == 'nl_inputs':
-            return model(nl_inputs=inputs)
-        else:
-            raise ValueError("character should be either 'code_inputs' or 'nl_inputs'")
-
-
-
-def get_model_embedding(date_p,embedding_batch_size,character):
+def get_model_embedding(date_p,embedding_batch_size):
     batch_chunked_data = chunked(date_p, embedding_batch_size) 
     print(f"Each batch includes {embedding_batch_size} data points")
 
@@ -164,8 +123,8 @@ def get_model_embedding(date_p,embedding_batch_size,character):
     sum_batch_number = 0
     total_batches = len(date_p) // embedding_batch_size + (1 if len(date_p) % embedding_batch_size != 0 else 0)
     for batch_data in tqdm(batch_chunked_data, total=total_batches, desc="Processing batches"):
-        batch_data_representation = codebert_embedding(batch_data,character,model)
-        embeddings_list.append(batch_data_representation.cpu().numpy())
+        batch_data_representation = l2v.encode(batch_data)
+        embeddings_list.append(batch_data_representation)
         sum_batch_number = sum_batch_number +1
 
     # Stack the embedded results of all batches into a matrix
@@ -187,7 +146,7 @@ def get_list_for_qu(data,name,instruction):
     result_list = []
     for item in data:
         if name in item:
-            result_list.append(instruction+item[name])
+            result_list.append([instruction,item[name]])
     return result_list
 
 def save_json(data, file_path):
@@ -201,7 +160,7 @@ def save_json(data, file_path):
 
 
 
-def run(model_name_or_path, finetuned_model_path, result_path, test_data_path, get_model_embedding_batch_size):
+def run(path, path2, result_path, test_data_path, get_model_embedding_batch_size):
     start_time = time.time()
     test_batch_size = 1000
     distance_metric ="cosine"
@@ -218,25 +177,26 @@ def run(model_name_or_path, finetuned_model_path, result_path, test_data_path, g
 
 
     # load model
-    global tokenizer, config, encoder, model, device, n_gpu  #
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    n_gpu = torch.cuda.device_count()
-    logging.debug("device: %s, n_gpu: %s",device, n_gpu)
-
-    tokenizer = RobertaTokenizer.from_pretrained(model_name_or_path)
-    config = RobertaConfig.from_pretrained(model_name_or_path)
-    encoder = RobertaModel.from_pretrained(model_name_or_path)
-    model = CodeBertModel(encoder)
-
-    if n_gpu > 1:
-        model = torch.nn.DataParallel(model)  
-
-    model_to_load = model.module if hasattr(model, 'module') else model 
-    model_to_load.load_state_dict(torch.load(finetuned_model_path))
-    model.eval()
-    model.to(device)
-    
-    logging.debug("Model and configuration have been successfully loaded!")
+    global l2v
+    tokenizer = AutoTokenizer.from_pretrained(
+        path
+    )
+    config = AutoConfig.from_pretrained(
+        path
+    )
+    model = AutoModel.from_pretrained(
+        path,
+        config=config,
+        torch_dtype=torch.bfloat16,
+        device_map="cuda" if torch.cuda.is_available() else "cpu",
+    )
+    model = PeftModel.from_pretrained(
+        model,
+        path2
+    )
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
+    l2v = LLM2Vec(model, tokenizer, pooling_mode="mean")
 
     # load data
     if not os.path.exists(output_cal_path):
@@ -260,7 +220,7 @@ def run(model_name_or_path, finetuned_model_path, result_path, test_data_path, g
         instruction = ("Given a code search query, retrieve relevant passages that answer the query:")
         data_docstring =get_list_for_qu(query_dataset,"query",instruction)
         print("Shape of data_docstring:", np.array(data_docstring).shape)
-        nl_vecs = get_model_embedding(data_docstring,get_model_embedding_batch_size,'nl_inputs')
+        nl_vecs = get_model_embedding(data_docstring,get_model_embedding_batch_size)
         save_representations(nl_vecs, data_docstring_path)
         print("Shape of data_docstring_representation:", np.array(nl_vecs).shape)
     
@@ -269,7 +229,7 @@ def run(model_name_or_path, finetuned_model_path, result_path, test_data_path, g
     else:
         data_code =get_list(code_dataset , "code")
         print("Shape of data_code:", np.array(data_code).shape)
-        code_vecs = get_model_embedding(data_code,get_model_embedding_batch_size,'code_inputs')
+        code_vecs = get_model_embedding(data_code,get_model_embedding_batch_size)
         save_representations(code_vecs, data_code_path)
         print("Shape of data_code_representation:", np.array(code_vecs).shape)
 
@@ -324,7 +284,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run LLM2Vec evaluation.")
     
     parser.add_argument("--model_name_or_path", type=str, required=True, help="The model checkpoint for weights initialization.")
-    parser.add_argument("--finetuned_model_path", type=str, required=True, help="The model checkpoint for weights initialization.")
+    parser.add_argument("--peft_model_name_or_path", type=str, required=True, help="The model checkpoint for weights initialization.")
     parser.add_argument("--result_path", type=str,  default="",help="The path to save the results.")
     parser.add_argument("--test_data_path_dir", type=str, default="", required=True, help="The directory containing the test data.")
     parser.add_argument("--embedding_batch_size", type=int, default=500, help="Batch size for getting model embeddings.")
@@ -332,7 +292,7 @@ def main():
     args = parser.parse_args()
 
     # Call run function
-    run(args.model_name_or_path, args.finetuned_model_path, args.result_path, args.test_data_path_dir, args.embedding_batch_size)
+    run(args.model_name_or_path, args.peft_model_name_or_path, args.result_path, args.test_data_path_dir, args.embedding_batch_size)
 
 if __name__ == "__main__":
     main()

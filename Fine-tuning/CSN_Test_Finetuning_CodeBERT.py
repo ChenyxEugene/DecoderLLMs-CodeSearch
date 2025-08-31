@@ -98,7 +98,7 @@ def compute_evaluation_metrics(code_representation,docstring_representation,test
 def load_representations(file_path: str) -> np.ndarray:
     return np.load(file_path)
 
-def tokenize_and_convert_to_ids(text_list, max_length=200):
+def tokenize_and_convert_to_ids(text_list, max_length=512):
 
     all_token_ids = []
 
@@ -259,7 +259,7 @@ def main():
     parser.add_argument("--model_name_or_path", type=str, required=True, help="The model checkpoint for weights initialization.")
     parser.add_argument("--finetuned_model_path", type=str, required=True, help="The model checkpoint for weights initialization.")
     parser.add_argument("--result_path", type=str,  default="",help="The path to save the results.")
-    parser.add_argument("--test_data_language_path_dir", type=str, default="", required=True, help="The directory containing the test data.")
+    parser.add_argument("--test_data_path_dir", type=str, default="", required=True, help="The directory containing the test data.")
     parser.add_argument("--embedding_batch_size", type=int, default=500, help="Batch size for getting model embeddings.")
 
     args = parser.parse_args()
@@ -267,7 +267,7 @@ def main():
 
 
     # Call run function
-    run(args.model_name_or_path, args.finetuned_model_path, args.result_path, args.test_data_language_path_dir, args.embedding_batch_size)
+    run(args.model_name_or_path, args.finetuned_model_path, args.result_path, args.test_data_path_dir, args.embedding_batch_size)
 
 if __name__ == "__main__":
     main()
