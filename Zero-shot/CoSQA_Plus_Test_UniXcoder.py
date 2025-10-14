@@ -128,7 +128,7 @@ def CalculateMRR(sort_lists,eval_file,query_idxs):
 def load_representations(file_path: str) -> np.ndarray:
     return np.load(file_path)
 
-def tokenize_and_convert_to_ids(text_list, max_length=200):
+def tokenize_and_convert_to_ids(text_list, max_length=512):
 
     all_token_ids = []
 

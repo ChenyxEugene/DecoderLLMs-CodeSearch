@@ -5,24 +5,35 @@ import numpy as np
 import time
 import sys
 import argparse
-from llm2vec import LLM2Vec
-
-from transformers import AutoTokenizer, AutoModel, AutoConfig
+from tqdm import tqdm
+from transformers import AutoTokenizer, AutoModel, AutoConfig, RobertaTokenizer, RobertaModel, RobertaConfig
 from peft import PeftModel
 
 from typing import Optional, List, Dict, Any, NamedTuple, Iterable, Tuple
 from more_itertools import chunked, flatten
 from scipy.spatial.distance import cdist
 
+import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import random
-from tqdm import tqdm
+import logging
 
-# 设置环境变量
-os.environ["HF_HUB_OFFLINE"] = "1"
-# os.environ["HF_HOME"] = "/share/home/chenyuxuan/.cache/huggingface/hub"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+class CodeBertModel(nn.Module):
+    def __init__(self, encoder):
+        super(CodeBertModel, self).__init__()
+        self.encoder = encoder
+      
+    def forward(self, code_inputs=None, nl_inputs=None): 
+        if code_inputs is not None:
+            outputs = self.encoder(code_inputs,attention_mask=code_inputs.ne(1))[1]
+            return torch.nn.functional.normalize(outputs, p=2, dim=1)
+        else:
+            outputs = self.encoder(nl_inputs,attention_mask=nl_inputs.ne(1))[1]
+            return torch.nn.functional.normalize(outputs, p=2, dim=1)
+
 
 
 def read_jsonl(file_path):
@@ -31,7 +42,7 @@ def read_jsonl(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
-                    if line.strip():  
+                    if line.strip(): 
                         data.append(json.loads(line.strip()))
                 except json.JSONDecodeError as e:
                     print(f"Error parsing JSON line: {line.strip()}")
@@ -69,7 +80,7 @@ def compute_evaluation_metrics(code_representation,docstring_representation,test
     sum_mrr = 0.0
     num_batches = 0
     
-    batched_random_code_representation = list(chunked(list(random_code_representation), test_batch_size)) 
+    batched_random_code_representation = list(chunked(list(random_code_representation), test_batch_size))
     batched_random_docstring_representation = list(chunked(list(random_docstring_representation), test_batch_size))
 
     for batch_idx, (batch_code, batch_doc) in enumerate(zip(batched_random_code_representation, batched_random_docstring_representation)):
@@ -88,8 +99,36 @@ def compute_evaluation_metrics(code_representation,docstring_representation,test
 def load_representations(file_path: str) -> np.ndarray:
     return np.load(file_path)
 
+def tokenize_and_convert_to_ids(text_list, max_length=200):
 
-def get_model_embedding(date_p,embedding_batch_size, l2v):
+    all_token_ids = []
+
+    for text in text_list:
+
+        cleaned_text = ' '.join(text.split())
+        tokens = tokenizer.tokenize(cleaned_text)[:max_length - 2] 
+        tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token] 
+        token_ids = tokenizer.convert_tokens_to_ids(tokens)  
+        padding_length = max_length - len(token_ids)
+        token_ids += [tokenizer.pad_token_id] * padding_length  
+
+        all_token_ids.append(token_ids)
+    
+    return torch.tensor(all_token_ids, dtype=torch.long)
+
+def codebert_embedding(data,  character,model):
+    inputs0 = tokenize_and_convert_to_ids(data)
+    inputs = inputs0.to(device)  
+    with torch.no_grad():
+        if character == 'code_inputs':
+            return model(code_inputs=inputs)
+        elif character == 'nl_inputs':
+            return model(nl_inputs=inputs)
+        else:
+            raise ValueError("character should be either 'code_inputs' or 'nl_inputs'")
+
+
+def get_model_embedding(date_p,embedding_batch_size,character, model):
     # Batch data
     batch_chunked_data = chunked(date_p, embedding_batch_size) 
     print(f" Each batch contains {embedding_batch_size} data ")
@@ -98,11 +137,10 @@ def get_model_embedding(date_p,embedding_batch_size, l2v):
     sum_batch_number = 0
     total_batches = len(date_p) // embedding_batch_size + (1 if len(date_p) % embedding_batch_size != 0 else 0)
     for batch_data in tqdm(batch_chunked_data, total=total_batches, desc="Processing batches"):
-        batch_data_representation = l2v.encode(batch_data)
-        embeddings_list.append(batch_data_representation)
+        batch_data_representation = codebert_embedding(batch_data,character,model)
+        embeddings_list.append(batch_data_representation.cpu().numpy())
         sum_batch_number = sum_batch_number +1
-        # print(f"Embedding batch {sum_batch_number}, total {total_batches} batches")
-
+        # logging.debug(f"Embedding batch {sum_batch_number}, total {total_batches} batches")
     # Stack the embedded results of all batches into a matrix
     matrix_presentation = np.vstack(embeddings_list)
     
@@ -122,7 +160,7 @@ def get_list_for_qu(data,name,instruction):
     result_list = []
     for item in data:
         if name in item:
-            result_list.append([instruction,item[name]])
+            result_list.append(instruction+item[name])
     return result_list
 
 def save_json(data, file_path):
@@ -135,37 +173,31 @@ def save_json(data, file_path):
 
 
 
-def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_size):
+def run(model_name_or_path, result_path, test_data_path_dir, get_model_embedding_batch_size):
     test_batch_size = 1000
     distance_metric ="cosine"
     # load model
-    tokenizer = AutoTokenizer.from_pretrained(
-        path
-    )
-    config = AutoConfig.from_pretrained(
-        path
-    )
-    model = AutoModel.from_pretrained(
-        path,
-        config=config,
-        torch_dtype=torch.bfloat16,
-        device_map="cuda" if torch.cuda.is_available() else "cpu",
-    )
-    model = PeftModel.from_pretrained(
-        model,
-        path2
-    )
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"
-    l2v = LLM2Vec(model, tokenizer, pooling_mode="mean")
+    global tokenizer, config, encoder, model, device, n_gpu  #
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    n_gpu = torch.cuda.device_count()
+    logging.debug("device: %s, n_gpu: %s",device, n_gpu)
 
+    tokenizer = RobertaTokenizer.from_pretrained(model_name_or_path)
+    config = RobertaConfig.from_pretrained(model_name_or_path)
+    encoder = RobertaModel.from_pretrained(model_name_or_path)
+    model = CodeBertModel(encoder)
+    if n_gpu > 1:
+        model = torch.nn.DataParallel(model)  
+    model.eval()
+    model.to(device)
+    logging.debug("Model and configuration have been successfully loaded!")
 
     # Run CodeSearchNet's test for each language
     for language in ('python', 'go', 'javascript', 'java', 'php', 'ruby'):
         start_time = time.time()
         print("Evaluating language: {}".format(language))
 
-        # Create a result saving path and a file reading path
+        #Create a result saving path and a file reading path
         output_cal_path = os.path.join(result_path, "test", language)
         mrr_path = os.path.join(result_path, "test", language, f"{language}_mrr.json")
         data_code_path = "{}/test/{}/{}_data_code_repre.npy".format(result_path, language, language)
@@ -179,7 +211,6 @@ def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_
         else:
             print(f"Directory already exists: {output_cal_path}")
 
-        # test_data_file = os.path.join(test_data_language_path_dir, language, "final/jsonl/test", f"{language}_test_0.jsonl")
         data = read_jsonl(test_data_file)
 
         # The query and code embedding are vectors and saved
@@ -188,7 +219,7 @@ def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_
         else:
             data_code =get_list(data,"code")
             print("Shape of data_code:", np.array(data_code).shape)
-            data_code_representation = get_model_embedding(data_code,get_model_embedding_batch_size, l2v)
+            data_code_representation = get_model_embedding(data_code,get_model_embedding_batch_size,'code_inputs', model)
             save_representations(data_code_representation, data_code_path)
             print("Shape of data_code_representation:", np.array(data_code_representation).shape)
 
@@ -203,7 +234,7 @@ def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_
             data_docstring =get_list_for_qu(data,"docstring",instruction)
             print("Shape of data_docstring:", np.array(data_docstring).shape)
 
-            data_docstring_representation = get_model_embedding(data_docstring,get_model_embedding_batch_size, l2v)
+            data_docstring_representation = get_model_embedding(data_docstring,get_model_embedding_batch_size,'nl_inputs', model)
             save_representations(data_docstring_representation, data_docstring_path)
             print("Shape of data_docstring_representation:", np.array(data_docstring_representation).shape)
 
@@ -215,7 +246,7 @@ def run(path, path2, result_path, test_data_path_dir, get_model_embedding_batch_
         print(f"Time taken to create/check directory: {elapsed_time} seconds")
         mrr_score = {f'{language}_mrr': mrr_score_value,'elapsed_time':elapsed_time}
         save_json(mrr_score, mrr_path)
-
+        print(f"{language} MRR Score: {mrr_score[language + '_mrr']}")
 
 
 
@@ -223,15 +254,15 @@ def main():
     parser = argparse.ArgumentParser(description="Run LLM2Vec evaluation.")
     
     parser.add_argument("--model_name_or_path", type=str, required=True, help="The model checkpoint for weights initialization.")
-    parser.add_argument("--peft_model_name_or_path", type=str, required=True, help="The model checkpoint for weights initialization.")
     parser.add_argument("--result_path", type=str,  default="",help="The path to save the results.")
     parser.add_argument("--test_data_path_dir", type=str, default="", required=True, help="The directory containing the test data.")
     parser.add_argument("--embedding_batch_size", type=int, default=500, help="Batch size for getting model embeddings.")
 
+
     args = parser.parse_args()
 
     # Call run function
-    run(args.model_name_or_path, args.peft_model_name_or_path, args.result_path, args.test_data_path_dir, args.embedding_batch_size)
+    run(args.model_name_or_path, args.result_path, args.test_data_path_dir, args.embedding_batch_size)
 
 if __name__ == "__main__":
     main()

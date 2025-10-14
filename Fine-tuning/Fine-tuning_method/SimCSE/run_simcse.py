@@ -40,7 +40,6 @@ logger = get_logger(__name__, log_level="INFO")
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
-
 def initialize_peft(
     model,
     lora_r: int = 8,
@@ -51,8 +50,6 @@ def initialize_peft(
     if lora_modules is None and model.config.__class__.__name__ in [
         "LlamaConfig",
         "MistralConfig",
-        "GemmaConfig",
-        "Qwen2Config",
     ]:
         lora_modules = [
             "q_proj",

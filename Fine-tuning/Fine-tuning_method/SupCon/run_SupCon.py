@@ -5,7 +5,6 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
-
 from torch import nn
 from torch.utils.data import DataLoader, SequentialSampler
 
@@ -22,6 +21,8 @@ from transformers import (
     LlamaConfig,
     MistralConfig,
     GemmaConfig,
+    Qwen2Config,
+    Starcoder2Config,
     set_seed,
 )
 from transformers.trainer_utils import seed_worker
@@ -60,6 +61,17 @@ def prepare_for_tokenization(model, text, pooling_mode="mean"):
         "meta-llama/Llama-2-7b-chat-hf",
     ]:
         text = "[INST] " + text.strip() + " [/INST]"
+    if model.config._name_or_path in [
+        "google/gemma-2-9b-it",
+    ]:
+        text = "<bos><start_of_turn>user\n" + text.strip() + "<end_of_turn>"
+    if model.config._name_or_path in [
+        "Qwen/Qwen2-1.5B-Instruct",
+        "Qwen/Qwen2-7B-Instruct",
+    ]:
+        text = "<|im_start|>user\n" + text.strip() + "<|im_end|>"
+    
+        
     if pooling_mode == "eos_token":
         if model.config._name_or_path == "meta-llama/Meta-Llama-3-8B":
             text = text.strip() + "<|end_of_text|>"
@@ -67,6 +79,14 @@ def prepare_for_tokenization(model, text, pooling_mode="mean"):
             model.config, MistralConfig
         ):
             text = text.strip() + " </s>"
+        elif isinstance(model.config, GemmaConfig):
+            text = text.strip() + "<eos>"
+        # === 修改点 ===
+        # Starcoder2 和 Qwen2 使用相同的 EOS token，所以将它们的判断合并
+        elif isinstance(model.config, Qwen2Config) or isinstance(
+            model.config, Starcoder2Config
+        ):
+            text = text.strip() + "<|endoftext|>"
 
     return text
 
@@ -82,6 +102,8 @@ def initialize_peft(
         "LlamaConfig",
         "MistralConfig",
         "GemmaConfig",
+        "Qwen2Config",
+        "Starcoder2Config"
     ]:
         lora_modules = [
             "q_proj",
@@ -439,11 +461,11 @@ def main():
         attn_implementation=model_args.attn_implementation,
     )
 
-
+    # 检查并打印模型的peft_config信息
     if hasattr(model.model, 'peft_config'):
         print("peft_config after from_pretrained:")
         print(model.model.peft_config)
-
+        # 如果已经存在peft_config，删除它以避免重复配置
         del model.model.peft_config
         print("Removed existing peft_config to avoid duplicate configuration.")
     else:
@@ -457,14 +479,14 @@ def main():
         lora_alpha=2 * custom_args.lora_r,
         lora_dropout=custom_args.lora_dropout,
     )
-
+    # 打印模型的peft_config信息
     if hasattr(model.model, 'peft_config'):
         print("peft_config after initialize_peft:")
         print(model.model.peft_config)
     else:
         print("No peft_config found in model.model.")
 
-
+    ##加入的部分
     tokenizer = model.tokenizer
 
     train_loss = load_loss(custom_args.loss_class, scale=custom_args.loss_scale)
@@ -479,7 +501,7 @@ def main():
         tokenizer=tokenizer,
         loss_function=train_loss,
     )
-
+    # 打印report_to属性的值
     print(f"report_to: {training_args.report_to}")
 
     if custom_args.stop_after_n_steps is not None:
@@ -487,7 +509,7 @@ def main():
 
     trainer.train()
 
-
+    # 打印训练完成的信息
     print("Training completed.")
 
 if __name__ == "__main__":

@@ -5,30 +5,10 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple, Union
 import json
 import torch
-print("PyTorch 版本:", torch.__version__)
-print("CUDA 是否可用:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("CUDA 版本:", torch.version.cuda)
-    print("可用的CUDA设备数量:", torch.cuda.device_count())
-    for i in range(torch.cuda.device_count()):
-        print(f"设备 {i}: {torch.cuda.get_device_name(i)}")
-else:
-    print("CUDA不可用")
-# 打印cuDNN版本
-print("cuDNN 版本:", torch.backends.cudnn.version())
-
-# 打印可用的CUDA设备数量
-print("可用的CUDA设备数量:", torch.cuda.device_count())
-
-# 如果至少有一个CUDA设备，打印第一个设备的名称
-if torch.cuda.device_count() > 0:
-    print("第一个CUDA设备名称:", torch.cuda.get_device_name(0))
 from torch import nn
 from torch.utils.data import DataLoader, SequentialSampler
-
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from accelerate.logging import get_logger
-
 import transformers
 from transformers import (
     MODEL_FOR_MASKED_LM_MAPPING,
@@ -44,17 +24,24 @@ from transformers import (
     set_seed,
 )
 from transformers.trainer_utils import seed_worker
-
 from peft import LoraConfig, get_peft_model
-
 from llm2vec import LLM2Vec
 from llm2vec.dataset.utils import load_dataset
 from llm2vec.loss.utils import load_loss
 from llm2vec.experiment_utils import generate_experiment_id
-
 from tqdm import tqdm
 
-
+# Print environment details
+print("PyTorch Version:", torch.__version__)
+print("CUDA Available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("CUDA Version:", torch.version.cuda)
+    print("Number of CUDA devices:", torch.cuda.device_count())
+    for i in range(torch.cuda.device_count()):
+        print(f"Device {i}: {torch.cuda.get_device_name(i)}")
+else:
+    print("CUDA is not available.")
+print("cuDNN Version:", torch.backends.cudnn.version())
 
 transformers.logging.set_verbosity_error()
 
@@ -89,7 +76,6 @@ def prepare_for_tokenization(model, text, pooling_mode="mean"):
     ]:
         text = "<|im_start|>user\n" + text.strip() + "<|im_end|>"
     
-        
     if pooling_mode == "eos_token":
         if model.config._name_or_path == "meta-llama/Meta-Llama-3-8B":
             text = text.strip() + "<|end_of_text|>"
@@ -228,7 +214,7 @@ class DataTrainingArguments:
             )
         },
     )
-    # =========== 新增参数定义 ===========
+    # =========== Added parameter definitions ===========
     discard_language: Optional[str] = field(
         default=None,
         metadata={"help": "The language dataset to discard. e.g. 'python'"}
@@ -237,7 +223,7 @@ class DataTrainingArguments:
         default=1.0,
         metadata={"help": "The proportion of the specified language dataset to discard (from 0.0 to 1.0)."}
     )
-    # ==================================
+    # =================================================
 
 
 @dataclass
@@ -380,17 +366,14 @@ class LLM2VecSupervisedTrainer(Trainer):
         self.model.save(output_dir)
         torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
 
-# ==============================================================================
-# ======================== START OF FINAL DEBUG-PRINT BLOCK ====================
-# ==============================================================================
 
 def main():
-    # 1. 定义参数解析器
+    # 1. Define argument parser
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments, CustomArguments)
     )
 
-    # 2. 稳健的参数解析逻辑 (此部分已验证无误，保持不变)
+    # 2. Robust argument parsing logic
     def _dict_to_cli_args(config: Dict[str, Any]):
         args = []
         for key, value in config.items():
@@ -433,8 +416,7 @@ def main():
             custom_args,
         ) = parser.parse_args_into_dataclasses(args=cli_args)
 
-
-    # 3. 初始化 Accelerator (保持不变)
+    # 3. Initialize Accelerator
     if training_args.ddp_find_unused_parameters:
         kwargs = [
             DistributedDataParallelKwargs(find_unused_parameters=True)
@@ -443,11 +425,10 @@ def main():
         kwargs = []
     accelerator = Accelerator(kwargs_handlers=kwargs)
 
-
-    # ======================== 【新增的配置检查模块】 ========================
-    # 在这个阶段，所有的参数都已经被正确解析和覆盖了。
-    # 我们使用 accelerator 的日志记录器来打印最终生效的配置。
-    # 只在主进程（rank 0）上打印，避免多GPU时重复输出。
+    # ======================== [New Configuration Check Module] ========================
+    # At this stage, all parameters have been correctly parsed and overridden.
+    # We use the accelerator's logger to print the final effective configuration.
+    # Print only on the main process (rank 0) to avoid duplicate output in multi-GPU setups.
     if accelerator.is_main_process:
         logger.info("=" * 80)
         logger.info(" " * 25 + "FINAL CONFIGURATION CHECK" + " " * 25)
@@ -466,16 +447,14 @@ def main():
         logger.info(f"  - Per Device Batch Size:      {training_args.per_device_train_batch_size}")
         logger.info(f"  - Lora R:                     {custom_args.lora_r}")
         logger.info("=" * 80)
-    # ======================== 【打印模块结束】 ========================
+    # ======================== [End of Print Module] ========================
 
-
-    # 4. 后续的训练准备代码 (保持不变)
+    # 4. Subsequent training preparation code
     set_seed(training_args.seed)
 
     if training_args.gradient_checkpointing:
         training_args.gradient_checkpointing_kwargs = {"use_reentrant": False}
 
-    # 路径处理逻辑保持不变
     logger.info(f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}, " +
           f"distributed training: {training_args.parallel_mode.value == 'distributed'}")
     
@@ -557,6 +536,6 @@ def main():
 
     logger.info("Training completed.")
 
-#  ============================================================================
+
 if __name__ == "__main__":
     main()

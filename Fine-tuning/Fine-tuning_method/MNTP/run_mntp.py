@@ -53,7 +53,13 @@ from transformers.utils.versions import require_version
 
 from peft import LoraConfig, get_peft_model
 
-from llm2vec.models import MistralBiForMNTP, LlamaBiForMNTP ,GemmaBiForMNTP
+from ....llm2vec.models import (
+    MistralBiForMNTP,
+    LlamaBiForMNTP,
+    GemmaBiForMNTP,
+    Qwen2BiForMNTP,
+    Starcoder2BiForMNTP
+)
 import llm2vec.models
 
 
@@ -84,11 +90,11 @@ class LocalAccuracy:
 try:
     print("Script started.")
     
-
+    # 打印 llm2vec.models 模块路径
     print("llm2vec.models module path:", llm2vec.models.__file__)
     cache_dir = evaluate.__path__[0]
     print("Actual cache directory:", cache_dir)
-
+    # 打印可用的评价模块
     # available_metrics = evaluate.list_evaluation_modules()
     # print("Available metrics:", available_metrics)
     
@@ -106,9 +112,11 @@ logger = logging.getLogger(__name__)
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
-# os.environ["HF_HUB_OFFLINE"] = "1"
-# os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# os.environ["WANDB_DISABLED"] = "true"
+# 设置环境变量
+os.environ["HF_HUB_OFFLINE"] = "1"
+# os.environ["HF_HOME"] = "/share/home/chenyuxuan/.cache/huggingface/hub"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["WANDB_DISABLED"] = "true"
 
 def get_model_class(config):
     config_class_name = config.__class__.__name__
@@ -118,6 +126,10 @@ def get_model_class(config):
         return LlamaBiForMNTP
     elif config_class_name == "GemmaConfig":
         return GemmaBiForMNTP
+    elif config_class_name == "Qwen2Config":
+        return Qwen2BiForMNTP
+    elif config_class_name == "Starcoder2Config":
+        return Starcoder2BiForMNTP
     else:
         raise ValueError(f"Model class {config_class_name} not supported.")
 
@@ -132,7 +144,9 @@ def initialize_peft(
     if lora_modules is None and model.config.__class__.__name__ in [
         "LlamaConfig",
         "MistralConfig",
-        "GemmaConfig"
+        "GemmaConfig",
+        "Qwen2Config",
+        "Starcoder2Config"
     ]:
         lora_modules = [
             "q_proj",
@@ -588,6 +602,16 @@ def main():
     set_seed(training_args.seed)
 
 
+#     获取数据集:您可以提供自己的CSV/JSON/TXT培训和评估文件(见下文)
+# 或者只是在https://huggingface.co/datasets/上提供集线器上可用的公共数据集之一的名称
+# (数据集将自动从数据集中心下载
+
+# 对于CSV/JSON文件，该脚本将使用名为“text”的列或第一列。你可以很容易地调整这一点
+# 行为(见下文)
+
+# 在分布式训练中，load_dataset函数保证只有一个本地进程可以并发
+# 下载数据集。
+
     # Get the datasets: you can either provide your own CSV/JSON/TXT training and evaluation files (see below)
     # or just provide the name of one of the public datasets available on the hub at https://huggingface.co/datasets/
     # (the dataset will be downloaded automatically from the datasets Hub
@@ -636,14 +660,14 @@ def main():
 
         print(f"Data files: {data_files}")
         print(f"Extension: {extension}")
-     
+        # 加载数据集
         try:
             raw_datasets = load_dataset(
                 extension,
                 data_files=data_files,
                 cache_dir=model_args.cache_dir,
                 token=model_args.token,
-                download_mode="reuse_dataset_if_exists", 
+                download_mode="reuse_dataset_if_exists",  # 确保不下载
             )
             print("Dataset loaded successfully")
         except json.JSONDecodeError as e:
@@ -744,6 +768,7 @@ def main():
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    # 这里可能涉及到LLM2Vec包，没有修改bidirectional的问题
 
     # Loading bidirectional model using LLM2Vec package
     model_class = get_model_class(config)
@@ -933,11 +958,13 @@ def main():
                 logits = logits[0]
             return logits.argmax(dim=-1)
 
+        # 加载 accuracy 评价模块
 
         metric = LocalAccuracy()
         # metric = evaluate.load("accuracy", cache_dir=model_args.cache_dir)
         # accuracy_pkl_path = "/share/home/chenyuxuan/Research_CodeSearch/llm2v/llm2vec_mntp/accuracy_metric.pkl"
         # if os.path.exists(accuracy_pkl_path):
+        #     # 从.pkl文件加载 metric
         #     try:
         #         with open(accuracy_pkl_path, 'rb') as f:
         #             metric = pickle.load(f)
