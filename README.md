@@ -5,7 +5,7 @@ This repository contains the code and datasets for the paper ["Are Decoder-Only 
 Each section has its own dedicated directory containing all relevant scripts. Below, we provide an overview and demonstration example for each section.
 
 ## 🤗 Published Models
-For reproducibility, for the decoder-only large models evaluated in the paper, we have made public the corresponding Huggingface links. These links can be viewed specifically in the [HuggingFace Models list](https://github.com/ChenyxEugene/decoder-only-code-search/tree/main/HuggingFace_Models_list.md) and [HuggingFace collection of Are Decoder-Only LLMs the Silver Bullet](https://huggingface.co/collections/SYSUSELab/are-decoder-only-llms-the-silver-bullet).
+For reproducibility, for the decoder-only large models evaluated in the paper, we have made public the corresponding Huggingface links. These links can be viewed specifically in the [HuggingFace Models list](https://github.com/ChenyxEugene/DecoderLLMs-CodeSearch/blob/main/HuggingFace_Models_list.md) and [HuggingFace collection](https://huggingface.co/collections/SYSUSELab/are-decoder-only-llms-the-silver-bullet).
 
 
 ## Experimental Environment
@@ -28,6 +28,7 @@ For reproducibility, for the decoder-only large models evaluated in the paper, w
 To install the necessary dependencies, run the following commands:
 
 ```
+git clone https://github.com/ChenyxEugene/DecoderLLMs-CodeSearch.git
 cd decoder-only-code-search
 pip install -e .
 pip install -r requirements.txt
