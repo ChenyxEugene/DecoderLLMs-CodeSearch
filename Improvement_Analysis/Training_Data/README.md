@@ -14,14 +14,16 @@ This guide provides pre-trained models, data download links, and training instru
 
 To facilitate the reproduction of our paper's results, we provide Hugging Face Hub links for all key models. Some of the models trained on the E5 dataset are the official versions released by the `llm2vec` authors.
 
-| Trained On | Hugging Face Model Repo                                              | Notes                               |
-| :--------- | :------------------------------------------------------------------- | :---------------------------------- |
-| E5         | [`McGill-NLP/gemma-2b-it-e5`](https://huggingface.co/McGill-NLP/gemma-2b-it-e5) | Released by `llm2vec` authors       |
-| E5         | [`McGill-NLP/Mistral-7B-Instruct-v0.2-e5`](https://huggingface.co/McGill-NLP/Mistral-7B-Instruct-v0.2-e5) | Released by `llm2vec` authors       |
-| CSN        | `YourUsername/CodeGemma-7B-SupCon-CSN`                               | Trained by the authors of this paper |
-| ...        | *(Add other models you have trained and published to Hugging Face here)* | ...                                 |
+🤖 Huggingface Hugging Face ID of TABLE VI: Results of Different Fine-Tuning Datasets
 
-> **Note**: Please replace `YourUsername/YourModelRepo` with your actual Hugging Face repository IDs.
+| Sup Model | Dataset | Hugging Face ID |
+|---|---|---|
+| CodeGemma | E5 | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-E5](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-E5) |
+| CodeGemma | CSN | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN) |
+| Llama3 | E5 | [McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised](https://huggingface.co/McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised) |
+| Llama3 | CSN | [SYSUSELab/DCS-Llama3-8B-It-SupCon-CSN](https://huggingface.co/SYSUSELab/DCS-Llama3-8B-It-SupCon-CSN) |
+| Mistral | E5 | [McGill-NLP/LLM2Vec-Mistral-7B-Instruct-v2-mntp-supervised](https://huggingface.co/McGill-NLP/LLM2Vec-Mistral-7B-Instruct-v2-mntp-supervised) |
+| Mistral | CSN | [SYSUSELab/DCS-Mistral-7B-It-SupCon-CSN](https://huggingface.co/SYSUSELab/DCS-Mistral-7B-It-SupCon-CSN) 
 
 ## 🚀 Training from Scratch
 

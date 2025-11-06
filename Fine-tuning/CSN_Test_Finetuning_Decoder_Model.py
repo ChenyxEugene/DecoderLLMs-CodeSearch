@@ -5,7 +5,7 @@ import numpy as np
 import time
 import sys
 import argparse
-from ..llm2vec import LLM2Vec
+from llm2vec import LLM2Vec
 
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from peft import PeftModel

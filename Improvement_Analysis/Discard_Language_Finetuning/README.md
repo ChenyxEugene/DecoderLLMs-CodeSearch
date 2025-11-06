@@ -1,6 +1,23 @@
 # Project Training and Evaluation Guide
 
-This guide provides all necessary instructions to run the training and evaluation workflows for this project. It is assumed that you have already activated your required virtual environment.
+This guide provides all necessary instructions to run the training and evaluation workflows for this project. It is assumed that you have already activated your required virtual environment. 
+
+## 🤖 Hugging Face ID of TABLE VIII: Performance of Fine-Tuned CodeGemma Models by Discarding Language-Specific Data
+If you want to reproduce the results of the article, you can directly use the following models.
+
+| Model | Discard Language (SupCon) | Discard Ratio (SupCon) | Hugging Face ID |
+|---|---|---|---|
+| CodeGemma | Java | 0 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN |
+| CodeGemma | Java | 0.2 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-java-discard-0.2 |
+| CodeGemma | Java | 0.5 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-java-discard-0.5 |
+| CodeGemma | Java | 0.8 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-java-discard-0.8 |
+| CodeGemma | Java | 1 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-java-discard-1.0 |
+| CodeGemma | Ruby | 0 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN |
+| CodeGemma | Ruby | 0.2 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-ruby-discard-0.2 |
+| CodeGemma | Ruby | 0.5 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-ruby-discard-0.5 |
+| CodeGemma | Ruby | 0.8 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-ruby-discard-0.8 |
+| CodeGemma | Ruby | 1 | https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-ruby-discard-1.0 |
+
 
 ## ⚙️ Step 1: Configure the JSON File
 

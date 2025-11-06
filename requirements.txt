@@ -41,7 +41,6 @@ kiwisolver==1.4.5
 langchain-core==0.2.3
 langchain-huggingface==0.0.1
 langsmith==0.1.67
-llm2vec==0.1.8
 MarkupSafe==2.1.5
 matplotlib==3.7.5
 more-itertools==10.2.0

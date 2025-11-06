@@ -1,8 +1,12 @@
 # Are Decoder-Only Large Language Models the Silver Bullet for Code Search?
 
-This repository contains the code and datasets for the paper "Are Decoder-Only Large Language Models the Silver Bullet for Code Search?" Our work is divided into three main parts: zero-shot tests with decoder-only LLMs, fine-tuning tests with decoder-only LLMs, and improvement analysis. This repository provides the necessary code and data to reproduce our results.
+This repository contains the code and datasets for the paper ["Are Decoder-Only Large Language Models the Silver Bullet for Code Search?"](https://arxiv.org/abs/2410.22240). Our work is divided into three main parts: zero-shot tests with decoder-only LLMs, fine-tuning tests with decoder-only LLMs, and improvement analysis. This repository provides the necessary code and data to reproduce our results.
 
 Each section has its own dedicated directory containing all relevant scripts. Below, we provide an overview and demonstration example for each section.
+
+## 🤗 Published Models
+For reproducibility, for the decoder-only large models evaluated in the paper, we have made public the corresponding Huggingface links. These links can be viewed specifically in the [HuggingFace Models list](https://github.com/ChenyxEugene/decoder-only-code-search/tree/main/HuggingFace_Models_list.md) and [HuggingFace collection of Are Decoder-Only LLMs the Silver Bullet](https://huggingface.co/collections/SYSUSELab/are-decoder-only-llms-the-silver-bullet).
+
 
 ## Experimental Environment
 
@@ -25,6 +29,7 @@ To install the necessary dependencies, run the following commands:
 
 ```
 cd decoder-only-code-search
+pip install -e .
 pip install -r requirements.txt
 ```
 
@@ -45,7 +50,7 @@ Dataset
 
 ## Zero-Shot Test
 
-All scripts for zero-shot code search are located in the [Zero-shot](https://github.com/Georgepitt/decoder-only-code-search/tree/main/Zero-shot) directory. These scripts measure distances using cosine similarity. Below is an example of testing CodeGemma on the CodeSearchNet dataset. Additional examples can be found in the same directory.
+All scripts for zero-shot code search are located in the [Zero-shot](https://github.com/ChenyxEugene/decoder-only-code-search/tree/main/Zero-shot) directory. These scripts measure distances using cosine similarity. Below is an example of testing CodeGemma on the CodeSearchNet dataset. Additional examples can be found in the same directory.
 
 ```
 cd decoder-only-code-search/Zero-shot
@@ -72,7 +77,7 @@ Evaluating language: go
 
 ## Fine-Tuning Test
 
-All scripts for fine-tuning code search models are in the [Fine-tuning](https://github.com/Georgepitt/decoder-only-code-search/tree/main/Fine-tuning) directory. These scripts also use cosine similarity to measure distances. Below is an example of fine-tuning CodeGemma on the CodeSearchNet dataset. More examples can be found in the Fine-tuning directory. Note that before running the fine-tuning test, the model needs to be fine-tuned. Detailed instructions can be found in the [Fine-tuning Method](https://github.com/Georgepitt/decoder-only-code-search/tree/main/Fine-tuning/Fine-tuning_Method) directory.
+All scripts for fine-tuning code search models are in the [Fine-tuning](https://github.com/ChenyxEugene/decoder-only-code-search/tree/main/Fine-tuning) directory. These scripts also use cosine similarity to measure distances. Below is an example of fine-tuning CodeGemma on the CodeSearchNet dataset. More examples can be found in the Fine-tuning directory. Note that before running the fine-tuning test, the model needs to be fine-tuned. Detailed instructions can be found in the [Fine-tuning Method](https://github.com/ChenyxEugene/decoder-only-code-search/tree/main/Fine-tuning/Fine-tuning_Method) directory.
 
 ```
 cd decoder-only-code-search/Fine-tuning
@@ -87,4 +92,18 @@ python CSN_Test_Finetuning_Decoder_Model.py \
 
 ## Improvement Analysis
 
-All scripts for improvement analysis are provided in the [Improvement Analysis](https://github.com/Georgepitt/decoder-only-code-search/tree/main/Improvement_Analysis) directory.
+All scripts for improvement analysis are provided in the [Improvement Analysis](https://github.com/ChenyxEugene/decoder-only-code-search/tree/main/Improvement_Analysis) directory.
+
+
+## 📄 How to Cite
+
+If you use this repository or our work in your research, please cite our paper:
+
+```bibtex
+@article{chen2024decoder,
+  title={Are Decoder-Only Large Language Models the Silver Bullet for Code Search?},
+  author={Chen, Yuxuan and Liu, Mingwei and Ou, Guangsheng and Li, Anji and Dai, Dekun and Wang, Yanlin and Zheng, Zibin},
+  journal={arXiv preprint arXiv:2410.22240},
+  year={2024}
+}
+```

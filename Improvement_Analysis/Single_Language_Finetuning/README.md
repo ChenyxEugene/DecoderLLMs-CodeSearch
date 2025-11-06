@@ -1,4 +1,22 @@
+
+
+
 # Single-Language Fine-Tuning and Evaluation Guide
+
+
+## 🤖 Huggingface Face ID of TABLE VII: CodeGemma: Multi- vs. Single-language Tuning for Code Search
+If you want to reproduce the results of the article, you can directly use the following models.
+
+| Model | Training Language | Hugging Face ID |
+|---|---|---|
+| Codegemma | Ruby | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-ruby](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-ruby) |
+| Codegemma | Javascript | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-javascript](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-javascript) |
+| Codegemma | Go | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-go](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-go) |
+| Codegemma | Python | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-python](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-python) |
+| Codegemma | Java | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-java](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-java) |
+| Codegemma | Php | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-php](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN-php) |
+| Codegemma | Multi-language | [SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN](https://huggingface.co/SYSUSELab/DCS-CodeGemma-7B-It-SupCon-CSN) |
+
 
 This guide provides a complete workflow for fine-tuning a base model on individual programming languages and subsequently evaluating the performance of the fine-tuned models on the CodeSearchNet and CoSQA+ benchmarks.
 

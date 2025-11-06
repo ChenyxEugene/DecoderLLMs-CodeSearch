@@ -10,7 +10,7 @@ import numpy as np
 import time
 from tqdm import tqdm
 
-from ..llm2vec import LLM2Vec
+from llm2vec import LLM2Vec
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from peft import PeftModel
 
